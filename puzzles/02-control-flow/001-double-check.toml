@@ -1,0 +1,55 @@
+[metadata]
+id = "flow-001"
+title = "Double Check"
+difficulty = 2
+category = "patching"
+tags = ["multiple-conditions", "logic", "intermediate"]
+estimated_time_minutes = 10
+prerequisites = ["basic-003", "basic-004"]
+
+[description]
+brief = "Bypass multiple security checks"
+detailed = """
+This program has TWO separate security checks:
+1. EAX must equal 0xCAFE
+2. EBX must equal 0xBABE
+
+Neither register has the correct value. You'll need to
+bypass BOTH checks to reach the success code.
+
+Think strategically - what's the most efficient approach?
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0x1111
+ebx = 0x2222
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: cmp eax, 0xCAFE      ; 3D FE CA 00 00 - Check 1
+#   0x1005: jne fail             ; 75 10         - Fail if EAX wrong
+#   0x1007: cmp ebx, 0xBABE      ; 81 FB BE BA 00 00 - Check 2
+#   0x100D: jne fail             ; 75 08         - Fail if EBX wrong
+#   0x100F: mov eax, 1           ; B8 01 00 00 00 - Success!
+#   0x1014: jmp end              ; EB 05
+#   0x1016: fail: mov eax, 0     ; B8 00 00 00 00 - Failure
+#   0x101B: end: hlt             ; F4
+bytes = "3D FE CA 00 00 75 10 81 FB BE BA 00 00 75 08 B8 01 00 00 00 EB 05 B8 00 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "There are two JNE instructions - at 0x1005 and 0x100D. Both lead to failure."
+level2 = "You could NOP both jumps, or change them to unconditional jumps over the failure path."
+level3 = "Quick solution: NOP both JNE instructions: patch 0x1005 90 90 then patch 0x100D 90 90"

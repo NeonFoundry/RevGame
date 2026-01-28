@@ -1,0 +1,56 @@
+[metadata]
+id = "flow-005"
+title = "Arithmetic Check"
+difficulty = 2
+category = "patching"
+tags = ["arithmetic", "add", "sub", "intermediate"]
+estimated_time_minutes = 10
+prerequisites = ["flow-001"]
+
+[description]
+brief = "Understand arithmetic operations and patch results"
+detailed = """
+This program does some math on EAX:
+1. ADD EAX, 5  (adds 5)
+2. SUB EAX, 3  (subtracts 3)
+3. Compare result with 10
+
+EAX starts at 0, so: 0 + 5 - 3 = 2
+But we need the result to equal 10!
+
+You could patch the initial arithmetic, or patch the comparison,
+or even change the instructions entirely. Multiple solutions exist!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: add eax, 5           ; 83 C0 05 - EAX = EAX + 5
+#   0x1003: sub eax, 3           ; 83 E8 03 - EAX = EAX - 3
+#   0x1006: cmp eax, 10          ; 83 F8 0A - Compare with 10
+#   0x1009: je success           ; 74 07    - Jump if equal
+#   0x100B: mov eax, 0           ; B8 00 00 00 00 - Failure
+#   0x1010: jmp end              ; EB 05
+#   0x1012: success: mov eax, 1  ; B8 01 00 00 00 - Success
+#   0x1017: end: hlt             ; F4
+bytes = "83 C0 05 83 E8 03 83 F8 0A 74 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The math: 0 + 5 - 3 = 2, but we need 10. What values would give 10?"
+level2 = "You could: add more, subtract less, or change the comparison value to 2."
+level3 = "Easiest: change comparison from 10 to 2: patch 0x1008 02"

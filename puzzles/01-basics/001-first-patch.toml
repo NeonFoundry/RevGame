@@ -1,0 +1,51 @@
+[metadata]
+id = "basic-001"
+title = "Your First Patch"
+difficulty = 1
+category = "patching"
+tags = ["nop", "jump", "beginner"]
+estimated_time_minutes = 5
+
+[description]
+brief = "Learn to use NOP to skip unwanted instructions"
+detailed = """
+The program below checks if EAX equals 0x1337.
+Unfortunately, EAX is set to 0xDEAD - the wrong value!
+
+Your goal: Patch the code so the program sets EAX to 1 (success)
+instead of 0 (failure).
+
+Think about it: What if the comparison never happened?
+What if the jump was never taken?
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0xDEAD
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: cmp eax, 0x1337      ; 3D 37 13 00 00 - Compare EAX with magic value
+#   0x1005: jne fail             ; 75 07         - Jump to fail if not equal
+#   0x1007: mov eax, 1           ; B8 01 00 00 00 - Success: EAX = 1
+#   0x100C: jmp end              ; EB 05         - Skip failure code
+#   0x100E: fail: mov eax, 0     ; B8 00 00 00 00 - Failure: EAX = 0
+#   0x1013: end: hlt             ; F4            - Stop execution
+bytes = "3D 37 13 00 00 75 07 B8 01 00 00 00 EB 05 B8 00 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "Look at the JNE instruction at 0x1005. What does it do when EAX != 0x1337?"
+level2 = "The NOP instruction (opcode 0x90) does nothing - it just moves to the next instruction."
+level3 = "Replace the JNE instruction (75 07) with two NOPs (90 90) using: patch 0x1005 90 90"

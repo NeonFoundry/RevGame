@@ -1,0 +1,20 @@
+[package]
+name = "revgame-web"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "WASM web binary for RevGame"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+revgame-core.workspace = true
+revgame-ui.workspace = true
+ratatui.workspace = true
+ratzilla = "0.3"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["Window", "Document", "Storage"] }
+console_error_panic_hook = "0.1"
+log.workspace = true
+console_log = "1.0"

@@ -1,0 +1,52 @@
+[metadata]
+id = "flow-004"
+title = "Flag Check"
+difficulty = 2
+category = "analysis"
+tags = ["flags", "test", "intermediate"]
+estimated_time_minutes = 12
+prerequisites = ["flow-001"]
+
+[description]
+brief = "Understand CPU flags and TEST instruction"
+detailed = """
+This code uses TEST instead of CMP. TEST performs bitwise AND
+and sets flags, but doesn't store the result.
+
+TEST EAX, EAX sets the Zero Flag (ZF) if EAX is 0.
+JZ jumps if ZF is set (meaning EAX was zero).
+
+EAX is 0x10 (not zero), so ZF won't be set, and JZ won't jump.
+You need to reach the success code!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0x10
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: test eax, eax        ; 85 C0 - Set flags based on EAX AND EAX
+#   0x1002: jz success           ; 74 07 - Jump if Zero Flag set
+#   0x1004: mov eax, 0           ; B8 00 00 00 00 - Failure
+#   0x1009: jmp end              ; EB 05
+#   0x100B: success: mov eax, 1  ; B8 01 00 00 00 - Success
+#   0x1010: end: hlt             ; F4
+bytes = "85 C0 74 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "JZ jumps when ZF=1 (result was zero). JNZ jumps when ZF=0 (result non-zero)."
+level2 = "Since EAX is non-zero, TEST sets ZF=0. We want to jump when ZF=0!"
+level3 = "Change JZ (74) to JNZ (75): patch 0x1002 75"

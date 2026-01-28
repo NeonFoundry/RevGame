@@ -1,0 +1,50 @@
+[metadata]
+id = "basic-002"
+title = "Change the Value"
+difficulty = 1
+category = "patching"
+tags = ["immediate", "patch", "beginner"]
+estimated_time_minutes = 5
+prerequisites = ["basic-001"]
+
+[description]
+brief = "Learn to patch immediate values in code"
+detailed = """
+The program compares EAX with 0x42, but EAX contains 0x10.
+
+Instead of NOPing the comparison, try a different approach:
+Change the immediate value in the code so the comparison succeeds!
+
+Can you figure out which bytes represent the comparison value?
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0x10
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: cmp eax, 0x42        ; 83 F8 42 - Compare EAX with 0x42
+#   0x1003: jne fail             ; 75 07    - Jump to fail if not equal
+#   0x1005: mov eax, 1           ; B8 01 00 00 00 - Success
+#   0x100A: jmp end              ; EB 05    - Skip failure
+#   0x100C: fail: mov eax, 0     ; B8 00 00 00 00 - Failure
+#   0x1011: end: hlt             ; F4       - Stop
+bytes = "83 F8 42 75 07 B8 01 00 00 00 EB 05 B8 00 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The immediate value 0x42 is stored in the machine code. Where is it?"
+level2 = "Look at address 0x1002 - that's where the 0x42 (comparison value) is stored."
+level3 = "Patch the comparison value to match EAX: patch 0x1002 10"

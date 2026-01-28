@@ -1,0 +1,19 @@
+[package]
+name = "revgame-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Native terminal binary for RevGame"
+
+[[bin]]
+name = "revgame"
+path = "src/main.rs"
+
+[dependencies]
+revgame-core.workspace = true
+revgame-ui.workspace = true
+ratatui = { workspace = true, features = ["crossterm"] }
+crossterm = "0.28"
+anyhow.workspace = true
+log.workspace = true
+env_logger = "0.11"

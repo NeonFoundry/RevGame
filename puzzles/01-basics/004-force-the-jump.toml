@@ -1,0 +1,55 @@
+[metadata]
+id = "basic-004"
+title = "Force the Jump"
+difficulty = 1
+category = "patching"
+tags = ["unconditional-jump", "patch", "beginner"]
+estimated_time_minutes = 5
+prerequisites = ["basic-002"]
+
+[description]
+brief = "Learn to convert conditional jumps to unconditional"
+detailed = """
+The program checks multiple conditions before giving success.
+All conditions fail, so you'll get EAX = 0.
+
+But what if you could bypass all checks entirely?
+An unconditional JMP (0xEB) always jumps, ignoring all conditions!
+
+The conditional JE is a 2-byte instruction: 74 XX (where XX is the offset).
+JMP short is also 2 bytes: EB XX with the same offset format.
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0x00
+ebx = 0x00
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: cmp eax, 0x1337      ; 3D 37 13 00 00 - Check EAX
+#   0x1005: je success           ; 74 0C         - Jump if EAX == 0x1337 (fails)
+#   0x1007: cmp ebx, 0x1337      ; 81 FB 37 13 00 00 - Check EBX
+#   0x100D: je success           ; 74 04         - Jump if EBX == 0x1337 (fails)
+#   0x100F: mov eax, 0           ; B8 00 00 00 00 - Failure
+#   0x1014: hlt                  ; F4
+#   0x1015: success: mov eax, 1  ; B8 01 00 00 00 - Success
+#   0x101A: hlt                  ; F4
+bytes = "3D 37 13 00 00 74 0C 81 FB 37 13 00 00 74 04 B8 00 00 00 00 F4 B8 01 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "Neither EAX nor EBX contains 0x1337, so both conditional jumps fail."
+level2 = "JE (74) only jumps if the comparison was equal. JMP (EB) always jumps!"
+level3 = "Change the first JE to JMP: patch 0x1005 EB"

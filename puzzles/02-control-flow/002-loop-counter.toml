@@ -1,0 +1,53 @@
+[metadata]
+id = "flow-002"
+title = "Loop Counter"
+difficulty = 2
+category = "analysis"
+tags = ["loop", "counter", "intermediate"]
+estimated_time_minutes = 10
+prerequisites = ["basic-005"]
+
+[description]
+brief = "Understand and modify a loop counter"
+detailed = """
+This program counts down ECX from 5 to 0, adding 1 to EAX each iteration.
+The loop runs 5 times, so EAX ends up as 5.
+
+But we want EAX to be 10!
+
+The DEC ECX instruction subtracts 1 from ECX.
+The JNZ instruction jumps back while ECX != 0.
+
+Can you make the loop run 10 times instead?
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+ecx = 5
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: loop_start:
+#   0x1000:   inc eax            ; 40 - Add 1 to EAX
+#   0x1001:   dec ecx            ; 49 - Subtract 1 from ECX
+#   0x1002:   jnz loop_start     ; 75 FC - Loop while ECX != 0
+#   0x1004: hlt                  ; F4 - Stop
+bytes = "40 49 75 FC F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 10
+
+[hints]
+level1 = "ECX starts at 5 and counts down. We need it to start at 10 instead."
+level2 = "ECX is set in the registers section. But you can only patch CODE, not initial registers..."
+level3 = "Add a MOV ECX, 10 before the loop! But that changes offsets... Or patch initial ECX directly if your debugger supports it. Alternative: modify the loop comparison logic."

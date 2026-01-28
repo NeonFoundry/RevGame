@@ -1,0 +1,52 @@
+[metadata]
+id = "basic-003"
+title = "Jump Reversal"
+difficulty = 1
+category = "patching"
+tags = ["conditional-jump", "patch", "beginner"]
+estimated_time_minutes = 5
+prerequisites = ["basic-001"]
+
+[description]
+brief = "Learn to reverse conditional jumps"
+detailed = """
+This program has the logic backwards!
+It jumps to success when EAX is NOT equal to 0x100, but EAX is 0x100.
+
+Instead of modifying values, try changing the type of jump:
+- JE (Jump if Equal) is opcode 0x74
+- JNE (Jump if Not Equal) is opcode 0x75
+
+Can you reverse the condition?
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0x100
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: cmp eax, 0x100       ; 3D 00 01 00 00 - Compare EAX with 0x100
+#   0x1005: jne success          ; 75 07         - Jump to success if NOT equal (wrong!)
+#   0x1007: mov eax, 0           ; B8 00 00 00 00 - Failure: EAX = 0
+#   0x100C: jmp end              ; EB 05         - Skip success
+#   0x100E: success: mov eax, 1  ; B8 01 00 00 00 - Success: EAX = 1
+#   0x1013: end: hlt             ; F4            - Stop
+bytes = "3D 00 01 00 00 75 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The conditional jump at 0x1005 is JNE (75). We need the opposite behavior."
+level2 = "JE (Jump if Equal) has opcode 0x74, JNE has 0x75. They're just one bit different!"
+level3 = "Change JNE to JE: patch 0x1005 74"

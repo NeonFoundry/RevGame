@@ -1,0 +1,12 @@
+[package]
+name = "revgame-ui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "TUI components and screens for RevGame"
+
+[dependencies]
+revgame-core.workspace = true
+ratatui.workspace = true
+serde.workspace = true
+log.workspace = true

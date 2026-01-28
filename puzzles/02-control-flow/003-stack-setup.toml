@@ -1,0 +1,51 @@
+[metadata]
+id = "flow-003"
+title = "Stack Setup"
+difficulty = 2
+category = "analysis"
+tags = ["stack", "push", "pop", "intermediate"]
+estimated_time_minutes = 12
+prerequisites = ["flow-001"]
+
+[description]
+brief = "Understand stack operations and fix the return value"
+detailed = """
+This code pushes values to the stack and then pops them into EAX.
+It pushes 0 (failure) and then 1 (success), but pops in LIFO order.
+
+Stack is Last-In-First-Out, so POP gets the most recent PUSH.
+The code pushes: 0, then 1
+Then pops: gets 1 (the last pushed value)
+
+Wait, that should work... Let's look more carefully at what happens!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: push 0               ; 6A 00 - Push failure value
+#   0x1002: push 1               ; 6A 01 - Push success value
+#   0x1004: pop ebx              ; 5B - Pop into EBX (gets 1)
+#   0x1005: pop eax              ; 58 - Pop into EAX (gets 0) <- BUG!
+#   0x1006: hlt                  ; F4
+bytes = "6A 00 6A 01 5B 58 F4"
+entry_point = 0
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The first POP goes to EBX (the 1), the second POP goes to EAX (the 0)."
+level2 = "We need EAX to get the 1, not the 0. Can you swap the POP order?"
+level3 = "Swap the POP instructions: patch 0x1004 58 5B (POP EAX first, then POP EBX)"
