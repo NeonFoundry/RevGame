@@ -20,7 +20,7 @@ use revgame_ui::{
     app::{App, FocusedPanel, Screen},
     screens::{
         render_debugger, render_achievements, render_reference, render_search_dialog,
-        render_bookmarks_dialog, SearchMode,
+        render_bookmarks_dialog, render_puzzle_select, SearchMode,
     },
     TutorialTrigger,
 };
@@ -135,6 +135,7 @@ fn run_app<B: ratatui::backend::Backend>(
 fn ui(frame: &mut Frame, app: &App) {
     match app.screen {
         Screen::MainMenu => render_main_menu(frame, app),
+        Screen::PuzzleSelect => render_puzzle_select(frame, app, &app.puzzle_select_state, &app.theme),
         Screen::Debugger => render_debugger(frame, app),
         Screen::Achievements => render_achievements(frame, app, &app.theme),
         Screen::Reference => render_reference(frame, app, &app.reference_state, &app.theme),
@@ -188,7 +189,7 @@ fn render_main_menu(frame: &mut Frame, app: &App) {
     let menu_items = vec![
         ListItem::new("  [1] Start Tutorial (with walkthrough)"),
         ListItem::new("  [2] Quick Start (skip tutorial)"),
-        ListItem::new("  [3] Puzzle Select (coming soon)"),
+        ListItem::new("  [3] Puzzle Select"),
         ListItem::new("  [A] Achievements"),
         ListItem::new("  [R] x86 Reference Manual"),
         ListItem::new("  [Q] Quit"),
@@ -260,6 +261,7 @@ fn handle_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
 
     match app.screen {
         Screen::MainMenu => handle_main_menu_key(app, code),
+        Screen::PuzzleSelect => handle_puzzle_select_key(app, code),
         Screen::Debugger => handle_debugger_key(app, code, modifiers),
         Screen::Achievements => handle_achievements_key(app, code),
         Screen::Reference => handle_reference_key(app, code),
@@ -288,6 +290,19 @@ fn handle_main_menu_key(app: &mut App, code: KeyCode) {
                 });
             }
         }
+        KeyCode::Char('3') => {
+            // Open puzzle select
+            app.screen = Screen::PuzzleSelect;
+            // Load puzzles from the puzzles directory
+            let puzzles_dir = std::path::PathBuf::from("puzzles");
+            if let Err(e) = app.puzzle_select_state.load_puzzles(&puzzles_dir) {
+                app.message = Some(revgame_ui::app::Message {
+                    text: format!("Failed to load puzzles: {}", e),
+                    is_error: true,
+                });
+                app.screen = Screen::MainMenu;
+            }
+        }
         KeyCode::Char('a') | KeyCode::Char('A') => {
             app.screen = Screen::Achievements;
         }
@@ -308,6 +323,57 @@ fn handle_achievements_key(app: &mut App, code: KeyCode) {
     match code {
         KeyCode::Esc => {
             app.screen = Screen::MainMenu;
+        }
+        _ => {}
+    }
+}
+
+fn handle_puzzle_select_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.puzzle_select_state.navigate_up();
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.puzzle_select_state.navigate_down();
+        }
+        KeyCode::Enter => {
+            app.puzzle_select_state.enter();
+        }
+        KeyCode::Char('s') | KeyCode::Char('S') => {
+            // Start selected puzzle
+            if let Some(puzzle) = app.puzzle_select_state.get_selected_puzzle() {
+                if puzzle.is_locked {
+                    app.message = Some(revgame_ui::app::Message {
+                        text: "This puzzle is locked. Complete prerequisites first.".to_string(),
+                        is_error: true,
+                    });
+                } else {
+                    // Load puzzle from file
+                    match std::fs::read_to_string(&puzzle.file_path) {
+                        Ok(content) => {
+                            if let Err(e) = app.load_puzzle(&content) {
+                                app.message = Some(revgame_ui::app::Message {
+                                    text: format!("Failed to load puzzle: {}", e),
+                                    is_error: true,
+                                });
+                            }
+                        }
+                        Err(e) => {
+                            app.message = Some(revgame_ui::app::Message {
+                                text: format!("Failed to read puzzle file: {}", e),
+                                is_error: true,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        KeyCode::Esc | KeyCode::Backspace => {
+            app.puzzle_select_state.back();
+            // If we're back at category list and press Esc, go to menu
+            if app.puzzle_select_state.view_mode == revgame_ui::screens::SelectViewMode::CategoryList {
+                app.screen = Screen::MainMenu;
+            }
         }
         _ => {}
     }

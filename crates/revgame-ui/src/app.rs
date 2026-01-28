@@ -10,7 +10,7 @@ use revgame_core::{
 use crate::Theme;
 use crate::tutorial::{Tutorial, TutorialTrigger};
 use crate::widgets::RewindEffect;
-use crate::screens::{ReferenceState, SearchState, BookmarksViewState};
+use crate::screens::{ReferenceState, SearchState, BookmarksViewState, PuzzleSelectState};
 use crate::syntax::SyntaxHighlighter;
 
 /// Which panel is currently focused
@@ -133,6 +133,9 @@ pub struct App {
 
     /// Syntax highlighter for disassembly
     pub syntax_highlighter: SyntaxHighlighter,
+
+    /// Puzzle select state
+    pub puzzle_select_state: PuzzleSelectState,
 }
 
 impl Default for App {
@@ -166,6 +169,7 @@ impl App {
             bookmarks_view_state: BookmarksViewState::new(),
             bookmarks_dialog_open: false,
             syntax_highlighter: SyntaxHighlighter::new(),
+            puzzle_select_state: PuzzleSelectState::new(),
         }
     }
 

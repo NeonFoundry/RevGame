@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - String comparison puzzle
   - Array checksum with loops
   - Multi-stage validation crackme
+- **Puzzle Select Screen** - Browse and select puzzles from organized menu
+  - Navigate by category (Basics, Control Flow, Crackmes, Strings, Arrays)
+  - View puzzle details: title, difficulty, description, prerequisites
+  - Difficulty displayed as stars (★★★★)
+  - Lock system for prerequisite-based progression
+  - 16 puzzles across 5 categories
+  - Keyboard shortcut: [3] from main menu
 
 ### Planned
 - Web version (WASM support)
