@@ -1,0 +1,66 @@
+[metadata]
+id = "string-001"
+title = "String Comparison"
+difficulty = 2
+category = "strings"
+tags = ["strings", "comparison", "intermediate"]
+estimated_time_minutes = 10
+prerequisites = ["basic-005"]
+
+[description]
+brief = "Make the string comparison succeed"
+detailed = """
+This program compares two strings byte-by-byte:
+- String 1 at 0x2000: "PASS"
+- String 2 at 0x2010: "FAIL"
+
+The code loads 4 bytes from each string and compares them.
+Obviously they don't match!
+
+Options:
+1. Change "FAIL" to "PASS" in memory
+2. NOP out the comparison
+3. Change the jump condition
+
+Hint: The easiest solution is option 1 or 2!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+ebx = 0
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: mov eax, [0x2000]    ; A1 00 20 00 00 - Load "PASS" (as dword)
+#   0x1005: mov ebx, [0x2010]    ; 8B 1D 10 20 00 00 - Load "FAIL" (as dword)
+#   0x100B: cmp eax, ebx         ; 39 D8 - Compare
+#   0x100D: je success           ; 74 07
+#   0x100F: mov eax, 0           ; B8 00 00 00 00 - Failure
+#   0x1014: jmp end              ; EB 05
+#   0x1016: success: mov eax, 1  ; B8 01 00 00 00 - Success
+#   0x101B: end: hlt             ; F4
+bytes = "A1 00 20 00 00 8B 1D 10 20 00 00 39 D8 74 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[setup.data]
+# String 1: "PASS" (0x50415353 little-endian: 53 53 41 50)
+# String 2: "FAIL" (0x4641494C little-endian: 4C 49 41 46)
+# Followed by padding
+bytes = "50 41 53 53 00 00 00 00 00 00 00 00 00 00 00 00 46 41 49 4C"
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "Two strings are compared: 'PASS' and 'FAIL'. Make them match!"
+level2 = "Change 'FAIL' to 'PASS': Memory at 0x2010 contains 46 41 49 4C"
+level3 = "Patch 0x2010: patch 0x2010 50 41 53 53"

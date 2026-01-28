@@ -7,12 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **x86 Instruction Reference** - Built-in manual with 27 documented instructions across 7 categories
+  - Navigate by category or search specific instructions
+  - Syntax examples, descriptions, and flag effects
+  - Accessible via [R] from menu or [F1] during gameplay
+- **Search Functionality** - Advanced memory search capabilities
+  - Byte pattern search with hex input
+  - String search (case-sensitive/insensitive)
+  - Auto-detect null-terminated strings in memory
+  - Keyboard shortcut: [Ctrl+F]
+- **Bookmarks System** - Mark and annotate memory addresses
+  - Add/remove bookmarks at any address
+  - Edit notes for each bookmark
+  - Navigate between bookmarks (next/previous)
+  - View all bookmarks in organized list
+  - Keyboard shortcuts: [Ctrl+B] toggle, [M] list, [N]/[P] navigate
+- **Syntax Highlighting** - Color-coded instructions by category
+  - Data Movement (Cyan): MOV, LEA, XCHG
+  - Arithmetic (Green): ADD, SUB, MUL, DIV, INC, DEC
+  - Logic (Yellow): AND, OR, XOR, NOT, TEST
+  - Control Flow (Red): JMP, CALL, RET, LOOP
+  - Conditional (Light Red): Jcc, CMOVcc, SETcc
+  - Stack (Magenta): PUSH, POP
+  - Comparison (Light Yellow): CMP
+  - Shift (Blue): SHL, SHR, ROL, ROR
+  - Special (Gray): NOP, HLT, INT
+- **Save/Load System** - Persistent game progress
+  - Save puzzle state to disk (achievements, progress, statistics)
+  - Quick save/load functionality
+  - Platform-specific save directories
+  - Keyboard shortcuts: [F6]/[Ctrl+S] save, [F7]/[Ctrl+L] load
+- **Additional Puzzles** - 4 new challenging puzzles
+  - XOR decryption challenge
+  - String comparison puzzle
+  - Array checksum with loops
+  - Multi-stage validation crackme
+
 ### Planned
-- Built-in x86 instruction reference
-- Search functionality (bytes, strings, instructions)
-- Save/load puzzle progress
-- More puzzle categories
-- Syntax highlighting for instruction types
+- Web version (WASM support)
+- More puzzle categories (functions, advanced)
+- Settings menu with key remapping
 
 ## [0.1.0] - 2026-01-27
 

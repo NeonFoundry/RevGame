@@ -4,12 +4,14 @@ use revgame_core::{
     debugger::Debugger,
     emulator::DisassemblyLine,
     puzzle::{load_puzzle, Puzzle, ValidationResult, Validator},
-    game::GameState,
+    game::{GameState, SaveManager},
 };
 
 use crate::Theme;
 use crate::tutorial::{Tutorial, TutorialTrigger};
 use crate::widgets::RewindEffect;
+use crate::screens::{ReferenceState, SearchState, BookmarksViewState};
+use crate::syntax::SyntaxHighlighter;
 
 /// Which panel is currently focused
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +55,7 @@ pub enum Screen {
     Settings,
     Help,
     Achievements,
+    Reference,
     PuzzleComplete { message: String },
 }
 
@@ -112,6 +115,24 @@ pub struct App {
 
     /// VHS rewind effect
     pub rewind_effect: RewindEffect,
+
+    /// Instruction reference state
+    pub reference_state: ReferenceState,
+
+    /// Search dialog state
+    pub search_state: SearchState,
+
+    /// Whether search dialog is open
+    pub search_dialog_open: bool,
+
+    /// Bookmarks view state
+    pub bookmarks_view_state: BookmarksViewState,
+
+    /// Whether bookmarks dialog is open
+    pub bookmarks_dialog_open: bool,
+
+    /// Syntax highlighter for disassembly
+    pub syntax_highlighter: SyntaxHighlighter,
 }
 
 impl Default for App {
@@ -139,6 +160,12 @@ impl App {
             hint_level: 0,
             tutorial: None,
             rewind_effect: RewindEffect::new(),
+            reference_state: ReferenceState::new(),
+            search_state: SearchState::new(),
+            search_dialog_open: false,
+            bookmarks_view_state: BookmarksViewState::new(),
+            bookmarks_dialog_open: false,
+            syntax_highlighter: SyntaxHighlighter::new(),
         }
     }
 
@@ -576,6 +603,273 @@ impl App {
                 self.message = Some(Message {
                     text: format!("Unknown command: {}", parts[0]),
                     is_error: true,
+                });
+            }
+        }
+    }
+
+    /// Save game progress
+    pub fn save_game(&mut self, slot: &str) -> Result<(), String> {
+        let save_manager = SaveManager::new()?;
+        save_manager.save(&self.game_state, slot)?;
+
+        self.message = Some(Message {
+            text: format!("Game saved to slot: {}", slot),
+            is_error: false,
+        });
+
+        Ok(())
+    }
+
+    /// Load game progress
+    pub fn load_game(&mut self, slot: &str) -> Result<(), String> {
+        let save_manager = SaveManager::new()?;
+        let game_state = save_manager.load(slot)?;
+
+        self.game_state = game_state;
+
+        self.message = Some(Message {
+            text: format!("Game loaded from slot: {}", slot),
+            is_error: false,
+        });
+
+        Ok(())
+    }
+
+    /// Quick save (slot "quick")
+    pub fn quick_save(&mut self) -> Result<(), String> {
+        self.save_game("quick")
+    }
+
+    /// Quick load (slot "quick")
+    pub fn quick_load(&mut self) -> Result<(), String> {
+        self.load_game("quick")
+    }
+
+    /// Perform byte pattern search
+    pub fn search_bytes(&mut self) -> Result<(), String> {
+        use revgame_core::debugger::MemorySearch;
+
+        if let Some(ref dbg) = self.debugger {
+            // Parse hex pattern
+            let pattern = MemorySearch::parse_hex_pattern(&self.search_state.input)
+                .map_err(|e| format!("Invalid hex pattern: {}", e))?;
+
+            // Search in memory (0x0 to 0x10000 for now)
+            let results = MemorySearch::search_bytes(&dbg.memory, &pattern, 0x0, 0x10000)
+                .map_err(|e| format!("Search error: {}", e))?;
+
+            self.search_state.results = results;
+            self.search_state.selected_result = 0;
+
+            self.message = Some(Message {
+                text: format!("Found {} matches", self.search_state.results.len()),
+                is_error: false,
+            });
+
+            Ok(())
+        } else {
+            Err("No debugger active".to_string())
+        }
+    }
+
+    /// Perform string search
+    pub fn search_string(&mut self) -> Result<(), String> {
+        use revgame_core::debugger::MemorySearch;
+
+        if let Some(ref dbg) = self.debugger {
+            let results = MemorySearch::search_string(
+                &dbg.memory,
+                &self.search_state.input,
+                0x0,
+                0x10000,
+                self.search_state.case_sensitive,
+            )
+            .map_err(|e| format!("Search error: {}", e))?;
+
+            self.search_state.results = results;
+            self.search_state.selected_result = 0;
+
+            self.message = Some(Message {
+                text: format!("Found {} matches", self.search_state.results.len()),
+                is_error: false,
+            });
+
+            Ok(())
+        } else {
+            Err("No debugger active".to_string())
+        }
+    }
+
+    /// Find all strings in memory
+    pub fn find_strings(&mut self) -> Result<(), String> {
+        use revgame_core::debugger::MemorySearch;
+
+        if let Some(ref dbg) = self.debugger {
+            let results = MemorySearch::find_strings(
+                &dbg.memory,
+                self.search_state.min_string_length,
+                0x0,
+                0x10000,
+            )
+            .map_err(|e| format!("Search error: {}", e))?;
+
+            self.search_state.results = results;
+            self.search_state.selected_result = 0;
+
+            self.message = Some(Message {
+                text: format!("Found {} strings", self.search_state.results.len()),
+                is_error: false,
+            });
+
+            Ok(())
+        } else {
+            Err("No debugger active".to_string())
+        }
+    }
+
+    /// Jump to selected search result
+    pub fn goto_search_result(&mut self) {
+        if let Some(address) = self.search_state.get_selected_address() {
+            self.memory_view_addr = address;
+            self.search_dialog_open = false;
+
+            self.message = Some(Message {
+                text: format!("Jumped to 0x{:08X}", address),
+                is_error: false,
+            });
+        }
+    }
+
+    /// Toggle bookmark at current disassembly address
+    pub fn toggle_bookmark_at_cursor(&mut self) {
+        if let Some(ref mut dbg) = self.debugger {
+            if self.disasm_selection < self.disasm_cache.len() {
+                let address = self.disasm_cache[self.disasm_selection].address;
+                let added = dbg.bookmarks.toggle(address, format!("Address 0x{:08X}", address));
+
+                self.message = Some(Message {
+                    text: if added {
+                        format!("Bookmark added at 0x{:08X}", address)
+                    } else {
+                        format!("Bookmark removed at 0x{:08X}", address)
+                    },
+                    is_error: false,
+                });
+            }
+        }
+    }
+
+    /// Go to next bookmark
+    pub fn goto_next_bookmark(&mut self) {
+        if let Some(ref dbg) = self.debugger {
+            let current_addr = if self.disasm_selection < self.disasm_cache.len() {
+                self.disasm_cache[self.disasm_selection].address
+            } else {
+                self.memory_view_addr
+            };
+
+            if let Some(next_addr) = dbg.bookmarks.next_after(current_addr) {
+                self.memory_view_addr = next_addr;
+                self.message = Some(Message {
+                    text: format!("Jumped to bookmark at 0x{:08X}", next_addr),
+                    is_error: false,
+                });
+            } else {
+                self.message = Some(Message {
+                    text: "No more bookmarks after current address".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+    }
+
+    /// Go to previous bookmark
+    pub fn goto_prev_bookmark(&mut self) {
+        if let Some(ref dbg) = self.debugger {
+            let current_addr = if self.disasm_selection < self.disasm_cache.len() {
+                self.disasm_cache[self.disasm_selection].address
+            } else {
+                self.memory_view_addr
+            };
+
+            if let Some(prev_addr) = dbg.bookmarks.prev_before(current_addr) {
+                self.memory_view_addr = prev_addr;
+                self.message = Some(Message {
+                    text: format!("Jumped to bookmark at 0x{:08X}", prev_addr),
+                    is_error: false,
+                });
+            } else {
+                self.message = Some(Message {
+                    text: "No more bookmarks before current address".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+    }
+
+    /// Delete selected bookmark
+    pub fn delete_selected_bookmark(&mut self) {
+        if let Some(ref mut dbg) = self.debugger {
+            let bookmarks = dbg.bookmarks.list();
+            if self.bookmarks_view_state.selected < bookmarks.len() {
+                let address = bookmarks[self.bookmarks_view_state.selected].address;
+                dbg.bookmarks.remove(address);
+
+                // Adjust selection if needed
+                if self.bookmarks_view_state.selected > 0
+                    && self.bookmarks_view_state.selected >= dbg.bookmarks.count()
+                {
+                    self.bookmarks_view_state.selected -= 1;
+                }
+
+                self.message = Some(Message {
+                    text: format!("Bookmark deleted at 0x{:08X}", address),
+                    is_error: false,
+                });
+            }
+        }
+    }
+
+    /// Start editing selected bookmark
+    pub fn start_editing_bookmark(&mut self) {
+        if let Some(ref dbg) = self.debugger {
+            let bookmarks = dbg.bookmarks.list();
+            if self.bookmarks_view_state.selected < bookmarks.len() {
+                let bookmark = bookmarks[self.bookmarks_view_state.selected];
+                self.bookmarks_view_state
+                    .start_editing(bookmark.address, bookmark.note.clone());
+            }
+        }
+    }
+
+    /// Save edited bookmark
+    pub fn save_edited_bookmark(&mut self) {
+        if let Some(ref editing) = self.bookmarks_view_state.editing.clone() {
+            if let Some(ref mut dbg) = self.debugger {
+                dbg.bookmarks.update_note(editing.address, &editing.note);
+                self.bookmarks_view_state.cancel_editing();
+
+                self.message = Some(Message {
+                    text: format!("Bookmark updated at 0x{:08X}", editing.address),
+                    is_error: false,
+                });
+            }
+        }
+    }
+
+    /// Jump to selected bookmark in bookmarks dialog
+    pub fn goto_selected_bookmark(&mut self) {
+        if let Some(ref dbg) = self.debugger {
+            let bookmarks = dbg.bookmarks.list();
+            if self.bookmarks_view_state.selected < bookmarks.len() {
+                let address = bookmarks[self.bookmarks_view_state.selected].address;
+                self.memory_view_addr = address;
+                self.bookmarks_dialog_open = false;
+
+                self.message = Some(Message {
+                    text: format!("Jumped to 0x{:08X}", address),
+                    is_error: false,
                 });
             }
         }

@@ -68,6 +68,7 @@ pub fn render_debugger(frame: &mut Frame, app: &App) {
             debugger.cpu.eip,
             &debugger.breakpoints,
             &app.theme,
+            &app.syntax_highlighter,
         )
         .selected(app.disasm_selection)
         .focused(app.focused == FocusedPanel::Disassembly);

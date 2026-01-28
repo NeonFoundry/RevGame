@@ -1,8 +1,12 @@
 mod execution;
 mod history;
+mod search;
+mod bookmarks;
 
 pub use execution::{Debugger, DebuggerState, StepResult, RunResult};
 pub use history::{History, MemoryPatch};
+pub use search::{MemorySearch, SearchResult};
+pub use bookmarks::{Bookmark, BookmarkManager};
 
 use thiserror::Error;
 
@@ -28,4 +32,7 @@ pub enum DebuggerError {
 
     #[error("No actions to redo")]
     NothingToRedo,
+
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
 }

@@ -1,0 +1,75 @@
+[metadata]
+id = "crackme-003"
+title = "Two-Stage Validation"
+difficulty = 4
+category = "crackme"
+tags = ["multi-stage", "complex", "advanced"]
+estimated_time_minutes = 25
+prerequisites = ["crackme-002"]
+
+[description]
+brief = "Pass both validation stages"
+detailed = """
+This crackme has TWO validation stages:
+
+Stage 1: Check if input XOR 0x55 equals 0x33
+Stage 2: Check if input + 10 equals 0x50
+
+Your input is at 0x2000 (currently 0x42 = 'B')
+
+Stage 1: 0x42 XOR 0x55 = 0x17 (want 0x33)
+Stage 2: 0x42 + 10 = 0x4C (want 0x50)
+
+You need to find a value that passes BOTH checks!
+
+Stage 1: X XOR 0x55 = 0x33  →  X = 0x33 XOR 0x55 = 0x66
+Stage 2: X + 10 = 0x50      →  X = 0x50 - 10 = 0x46
+
+These are different! So you need to patch the code or checks.
+
+Hint: Maybe one of the checks needs to be "adjusted"...
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+ebx = 0
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: mov al, [0x2000]     ; A0 00 20 00 00 - Load input
+#   0x1005: xor al, 0x55         ; 34 55 - Stage 1: XOR
+#   0x1007: cmp al, 0x33         ; 3C 33 - Check stage 1
+#   0x1009: jne fail             ; 75 11 - Fail if not equal
+#
+#   0x100B: mov al, [0x2000]     ; A0 00 20 00 00 - Reload input
+#   0x1010: add al, 10           ; 04 0A - Stage 2: Add 10
+#   0x1012: cmp al, 0x50         ; 3C 50 - Check stage 2
+#   0x1014: jne fail             ; 75 06 - Fail if not equal
+#
+#   0x1016: mov eax, 1           ; B8 01 00 00 00 - Success
+#   0x101B: jmp end              ; EB 05
+#   0x101D: fail: mov eax, 0     ; B8 00 00 00 00 - Failure
+#   0x1022: end: hlt             ; F4
+bytes = "A0 00 20 00 00 34 55 3C 33 75 11 A0 00 20 00 00 04 0A 3C 50 75 06 B8 01 00 00 00 EB 05 B8 00 00 00 00 F4"
+entry_point = 0
+
+[setup.data]
+# Input: 0x42 ('B')
+bytes = "42"
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "Two checks with different math. Can one value pass both?"
+level2 = "Stage 1 needs 0x66, Stage 2 needs 0x46. They conflict! Patch one check."
+level3 = "Easiest: NOP stage 1 check: patch 0x1007 90 90 90 90"

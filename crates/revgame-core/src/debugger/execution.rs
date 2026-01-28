@@ -2,7 +2,7 @@ use std::collections::{HashSet, VecDeque};
 
 use crate::emulator::{CpuState, DisassemblyLine, ExecutionResult, Executor, Memory};
 
-use super::{DebuggerError, History, MemoryPatch};
+use super::{DebuggerError, History, MemoryPatch, BookmarkManager};
 
 /// Debugger execution state
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +90,9 @@ pub struct Debugger {
     /// Patch history for undo/redo
     patch_history: History,
 
+    /// Bookmarks for memory addresses
+    pub bookmarks: BookmarkManager,
+
     /// Initial state for reset
     initial_cpu: CpuState,
     initial_memory: Vec<u8>,
@@ -111,6 +114,7 @@ impl Debugger {
             history: VecDeque::new(),
             max_history: 1000,
             patch_history: History::new(100),
+            bookmarks: BookmarkManager::new(),
             initial_cpu: CpuState::default(),
             initial_memory: vec![0; memory_size],
         }
@@ -138,6 +142,7 @@ impl Debugger {
             history: VecDeque::new(),
             max_history: 1000,
             patch_history: History::new(100),
+            bookmarks: BookmarkManager::new(),
             initial_cpu: cpu,
             initial_memory: memory.raw().to_vec(),
         }

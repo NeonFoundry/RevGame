@@ -1,0 +1,65 @@
+[metadata]
+id = "crackme-002"
+title = "XOR Decryption"
+difficulty = 3
+category = "crackme"
+tags = ["xor", "encryption", "intermediate"]
+estimated_time_minutes = 15
+prerequisites = ["crackme-001"]
+
+[description]
+brief = "Decrypt the XOR-encrypted password"
+detailed = """
+This program compares a password against an encrypted value.
+The password is XOR-encrypted with key 0xAA.
+
+Your input (in memory at 0x2000) is:  0x42 (letter 'B')
+The encrypted target is:              0xC8
+
+The comparison XORs your input with 0xAA and checks if it equals 0xC8.
+
+What character do you need?
+B (0x42) XOR 0xAA = 0xE8 (not 0xC8)
+
+You need to find X where: X XOR 0xAA = 0xC8
+Answer: 0xC8 XOR 0xAA = 0x62 (letter 'b')
+
+Patch memory at 0x2000 to be 0x62 instead of 0x42!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: mov eax, [0x2000]    ; B8 00 20 00 00 - Load input
+#   0x1005: xor eax, 0xAA         ; 35 AA 00 00 00 - XOR with key
+#   0x100A: cmp eax, 0xC8         ; 3D C8 00 00 00 - Compare with encrypted target
+#   0x100F: je success            ; 74 07
+#   0x1011: mov eax, 0            ; B8 00 00 00 00 - Failure
+#   0x1016: jmp end               ; EB 05
+#   0x1018: success: mov eax, 1   ; B8 01 00 00 00 - Success
+#   0x101D: end: hlt              ; F4
+bytes = "A1 00 20 00 00 35 AA 00 00 00 3D C8 00 00 00 74 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[setup.data]
+# Input password: 'B' (0x42) - wrong!
+bytes = "42"
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The code XORs your input (0x42) with 0xAA. What do you get?"
+level2 = "0x42 XOR 0xAA = 0xE8. But we need 0xC8. Work backwards: 0xC8 XOR 0xAA = ?"
+level3 = "0xC8 XOR 0xAA = 0x62. Patch 0x2000 to be 0x62: patch 0x2000 62"

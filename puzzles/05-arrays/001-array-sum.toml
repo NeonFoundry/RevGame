@@ -1,0 +1,70 @@
+[metadata]
+id = "array-001"
+title = "Array Checksum"
+difficulty = 3
+category = "arrays"
+tags = ["arrays", "loop", "math", "advanced"]
+estimated_time_minutes = 20
+prerequisites = ["flow-002"]
+
+[description]
+brief = "Make the array checksum equal 100"
+detailed = """
+This program sums an array of 4 bytes and checks if the sum equals 100.
+
+The array at 0x2000 contains: [10, 20, 30, 40]
+Sum: 10 + 20 + 30 + 40 = 100
+
+Wait... that already equals 100! So why does it fail?
+
+Look closely at the loop. It uses ECX as a counter starting at 4,
+but the loop condition might be wrong!
+
+OR: Just change the array values to sum to the expected value.
+OR: Change what value the sum is compared against.
+
+Multiple solutions exist!
+"""
+
+[setup]
+memory_size = 16384
+code_start = 0x1000
+data_start = 0x2000
+stack_start = 0x3000
+
+[setup.registers]
+eax = 0
+ebx = 0x2000
+ecx = 4
+esp = 0x3000
+
+[setup.code]
+# Assembly:
+#   0x1000: xor eax, eax         ; 31 C0 - Clear sum
+#   0x1002: loop:                ; Loop starts here
+#   0x1002: movzx edx, byte [ebx] ; 0F B6 13 - Load byte (zero-extend)
+#   0x1005: add eax, edx         ; 01 D0 - Add to sum
+#   0x1007: inc ebx              ; 43 - Next byte
+#   0x1008: loop loop            ; E2 F8 - Decrement ECX, loop if not zero
+#   0x100A: cmp eax, 100         ; 83 F8 64 - Compare sum with 100
+#   0x100D: je success           ; 74 07
+#   0x100F: mov eax, 0           ; B8 00 00 00 00 - Failure
+#   0x1014: jmp end              ; EB 05
+#   0x1016: success: mov eax, 1  ; B8 01 00 00 00 - Success
+#   0x101B: end: hlt             ; F4
+bytes = "31 C0 0F B6 13 01 D0 43 E2 F8 83 F8 64 74 07 B8 00 00 00 00 EB 05 B8 01 00 00 00 F4"
+entry_point = 0
+
+[setup.data]
+# Array: [10, 20, 30, 40] which sums to 100
+bytes = "0A 14 1E 28"
+
+[validation]
+type = "register_value"
+register = "eax"
+expected = 1
+
+[hints]
+level1 = "The array [10,20,30,40] should sum to 100. But does it?"
+level2 = "The LOOP instruction decrements ECX and jumps if ECX != 0. Check if ECX starts at the right value."
+level3 = "Either change array values or NOP the comparison. Try: patch 0x100A 90 90 90"

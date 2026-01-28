@@ -18,7 +18,10 @@ use ratatui::{
 
 use revgame_ui::{
     app::{App, FocusedPanel, Screen},
-    screens::{render_debugger, render_achievements},
+    screens::{
+        render_debugger, render_achievements, render_reference, render_search_dialog,
+        render_bookmarks_dialog, SearchMode,
+    },
     TutorialTrigger,
 };
 
@@ -134,8 +137,22 @@ fn ui(frame: &mut Frame, app: &App) {
         Screen::MainMenu => render_main_menu(frame, app),
         Screen::Debugger => render_debugger(frame, app),
         Screen::Achievements => render_achievements(frame, app, &app.theme),
+        Screen::Reference => render_reference(frame, app, &app.reference_state, &app.theme),
         Screen::PuzzleComplete { ref message } => render_puzzle_complete(frame, app, message),
         _ => render_main_menu(frame, app), // Fallback
+    }
+
+    // Render search dialog overlay if open
+    if app.search_dialog_open {
+        render_search_dialog(frame, &app.search_state, &app.theme);
+    }
+
+    // Render bookmarks dialog overlay if open
+    if app.bookmarks_dialog_open {
+        if let Some(ref dbg) = app.debugger {
+            let bookmarks = dbg.bookmarks.list();
+            render_bookmarks_dialog(frame, &bookmarks, &app.bookmarks_view_state, &app.theme);
+        }
     }
 }
 
@@ -173,6 +190,7 @@ fn render_main_menu(frame: &mut Frame, app: &App) {
         ListItem::new("  [2] Quick Start (skip tutorial)"),
         ListItem::new("  [3] Puzzle Select (coming soon)"),
         ListItem::new("  [A] Achievements"),
+        ListItem::new("  [R] x86 Reference Manual"),
         ListItem::new("  [Q] Quit"),
     ];
 
@@ -228,10 +246,23 @@ fn render_puzzle_complete(frame: &mut Frame, app: &App, message: &str) {
 }
 
 fn handle_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+    // If search dialog is open, handle search keys first
+    if app.search_dialog_open {
+        handle_search_key(app, code);
+        return;
+    }
+
+    // If bookmarks dialog is open, handle bookmarks keys first
+    if app.bookmarks_dialog_open {
+        handle_bookmarks_key(app, code);
+        return;
+    }
+
     match app.screen {
         Screen::MainMenu => handle_main_menu_key(app, code),
         Screen::Debugger => handle_debugger_key(app, code, modifiers),
         Screen::Achievements => handle_achievements_key(app, code),
+        Screen::Reference => handle_reference_key(app, code),
         Screen::PuzzleComplete { .. } => handle_complete_key(app, code),
         _ => {}
     }
@@ -260,6 +291,9 @@ fn handle_main_menu_key(app: &mut App, code: KeyCode) {
         KeyCode::Char('a') | KeyCode::Char('A') => {
             app.screen = Screen::Achievements;
         }
+        KeyCode::Char('r') | KeyCode::Char('R') => {
+            app.screen = Screen::Reference;
+        }
         KeyCode::Char('q') | KeyCode::Char('Q') => {
             app.should_quit = true;
         }
@@ -274,6 +308,28 @@ fn handle_achievements_key(app: &mut App, code: KeyCode) {
     match code {
         KeyCode::Esc => {
             app.screen = Screen::MainMenu;
+        }
+        _ => {}
+    }
+}
+
+fn handle_reference_key(app: &mut App, code: KeyCode) {
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.reference_state.navigate_up();
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.reference_state.navigate_down();
+        }
+        KeyCode::Enter => {
+            app.reference_state.enter();
+        }
+        KeyCode::Esc | KeyCode::Backspace => {
+            app.reference_state.back();
+            // If we're back at category list and press Esc, go to menu
+            if app.reference_state.view_mode == revgame_ui::screens::ReferenceViewMode::CategoryList {
+                app.screen = Screen::MainMenu;
+            }
         }
         _ => {}
     }
@@ -348,11 +404,11 @@ fn handle_panel_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             app.step();
             app.trigger_tutorial(TutorialTrigger::Step);
         }
-        KeyCode::Char('s') => {
+        KeyCode::Char('s') if !modifiers.contains(KeyModifiers::CONTROL) => {
             app.step();
             app.trigger_tutorial(TutorialTrigger::Step);
         }
-        KeyCode::Char('r') => {
+        KeyCode::Char('r') if !modifiers.contains(KeyModifiers::CONTROL) => {
             app.run();
             app.trigger_tutorial(TutorialTrigger::Run);
         }
@@ -360,17 +416,14 @@ fn handle_panel_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             app.toggle_breakpoint();
             app.trigger_tutorial(TutorialTrigger::SetBreakpoint);
         }
-        KeyCode::Char('b') => {
+        KeyCode::Char('b') if !modifiers.contains(KeyModifiers::CONTROL) => {
             app.toggle_breakpoint();
             app.trigger_tutorial(TutorialTrigger::SetBreakpoint);
         }
 
-        // Other
+        // x86 Reference Manual
         KeyCode::F(1) | KeyCode::Char('?') => {
-            app.message = Some(revgame_ui::app::Message {
-                text: "F5=Run F10=Step F9=Breakpoint Tab=Focus h=Hint :=Command".to_string(),
-                is_error: false,
-            });
+            app.screen = Screen::Reference;
         }
         KeyCode::Char('h') => {
             app.show_hint();
@@ -424,6 +477,84 @@ fn handle_panel_key(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             }
         }
 
+        // Quick Save (F6 or Ctrl+S)
+        KeyCode::F(6) => {
+            if let Err(e) = app.quick_save() {
+                app.message = Some(revgame_ui::app::Message {
+                    text: e,
+                    is_error: true,
+                });
+            } else {
+                app.message = Some(revgame_ui::app::Message {
+                    text: "Game saved to quicksave slot".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+        KeyCode::Char('s') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Err(e) = app.quick_save() {
+                app.message = Some(revgame_ui::app::Message {
+                    text: e,
+                    is_error: true,
+                });
+            } else {
+                app.message = Some(revgame_ui::app::Message {
+                    text: "Game saved to quicksave slot".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+
+        // Quick Load (F7 or Ctrl+L)
+        KeyCode::F(7) => {
+            if let Err(e) = app.quick_load() {
+                app.message = Some(revgame_ui::app::Message {
+                    text: e,
+                    is_error: true,
+                });
+            } else {
+                app.message = Some(revgame_ui::app::Message {
+                    text: "Game loaded from quicksave slot".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+        KeyCode::Char('l') if modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Err(e) = app.quick_load() {
+                app.message = Some(revgame_ui::app::Message {
+                    text: e,
+                    is_error: true,
+                });
+            } else {
+                app.message = Some(revgame_ui::app::Message {
+                    text: "Game loaded from quicksave slot".to_string(),
+                    is_error: false,
+                });
+            }
+        }
+
+        // Search (Ctrl+F)
+        KeyCode::Char('f') if modifiers.contains(KeyModifiers::CONTROL) => {
+            app.search_dialog_open = true;
+            app.search_state.clear_results();
+            app.search_state.input.clear();
+        }
+
+        // Bookmarks
+        KeyCode::Char('b') if modifiers.contains(KeyModifiers::CONTROL) => {
+            app.toggle_bookmark_at_cursor();
+        }
+        KeyCode::Char('m') | KeyCode::Char('M') => {
+            app.bookmarks_dialog_open = true;
+            app.bookmarks_view_state.selected = 0;
+        }
+        KeyCode::Char('n') if !modifiers.contains(KeyModifiers::CONTROL) => {
+            app.goto_next_bookmark();
+        }
+        KeyCode::Char('p') if !modifiers.contains(KeyModifiers::CONTROL) => {
+            app.goto_prev_bookmark();
+        }
+
         // Menu (only if not in tutorial)
         KeyCode::Esc => {
             if !app.is_tutorial_active() {
@@ -462,6 +593,147 @@ fn handle_command_input(app: &mut App, code: KeyCode) {
         }
         KeyCode::Char(c) => {
             app.command_input.push(c);
+        }
+        _ => {}
+    }
+}
+
+fn handle_search_key(app: &mut App, code: KeyCode) {
+    match code {
+        // Mode selection
+        KeyCode::Char('1') => {
+            app.search_state.mode = SearchMode::Bytes;
+            app.search_state.clear_results();
+        }
+        KeyCode::Char('2') => {
+            app.search_state.mode = SearchMode::String;
+            app.search_state.clear_results();
+        }
+        KeyCode::Char('3') => {
+            app.search_state.mode = SearchMode::FindStrings;
+            app.search_state.clear_results();
+        }
+
+        // Toggle case sensitivity (String mode only)
+        KeyCode::Char('c') | KeyCode::Char('C') => {
+            if app.search_state.mode == SearchMode::String {
+                app.search_state.case_sensitive = !app.search_state.case_sensitive;
+            }
+        }
+
+        // Adjust min string length (FindStrings mode only)
+        KeyCode::Char('+') | KeyCode::Char('=') => {
+            if app.search_state.mode == SearchMode::FindStrings {
+                app.search_state.min_string_length = app.search_state.min_string_length.saturating_add(1);
+            }
+        }
+        KeyCode::Char('-') | KeyCode::Char('_') => {
+            if app.search_state.mode == SearchMode::FindStrings {
+                app.search_state.min_string_length = app.search_state.min_string_length.saturating_sub(1).max(1);
+            }
+        }
+
+        // Navigation
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.search_state.navigate_up();
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.search_state.navigate_down();
+        }
+
+        // Execute search
+        KeyCode::Enter => {
+            let result = match app.search_state.mode {
+                SearchMode::Bytes => app.search_bytes(),
+                SearchMode::String => app.search_string(),
+                SearchMode::FindStrings => app.find_strings(),
+            };
+
+            if let Err(e) = result {
+                app.message = Some(revgame_ui::app::Message {
+                    text: e,
+                    is_error: true,
+                });
+            }
+        }
+
+        // Go to selected result
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            app.goto_search_result();
+        }
+
+        // Text input (for Bytes and String modes)
+        KeyCode::Char(c) if matches!(app.search_state.mode, SearchMode::Bytes | SearchMode::String) => {
+            app.search_state.input.push(c);
+        }
+
+        // Backspace
+        KeyCode::Backspace => {
+            app.search_state.input.pop();
+        }
+
+        // Close dialog
+        KeyCode::Esc => {
+            app.search_dialog_open = false;
+            app.search_state.clear_results();
+            app.search_state.input.clear();
+        }
+
+        _ => {}
+    }
+}
+
+fn handle_bookmarks_key(app: &mut App, code: KeyCode) {
+    // If editing a bookmark, handle edit keys
+    if app.bookmarks_view_state.is_editing() {
+        match code {
+            KeyCode::Enter => {
+                app.save_edited_bookmark();
+            }
+            KeyCode::Esc => {
+                app.bookmarks_view_state.cancel_editing();
+            }
+            KeyCode::Backspace => {
+                if let Some(ref mut editing) = app.bookmarks_view_state.editing {
+                    editing.note.pop();
+                }
+            }
+            KeyCode::Char(c) => {
+                if let Some(ref mut editing) = app.bookmarks_view_state.editing {
+                    editing.note.push(c);
+                }
+            }
+            _ => {}
+        }
+        return;
+    }
+
+    // Normal bookmark list navigation
+    match code {
+        KeyCode::Up | KeyCode::Char('k') => {
+            if let Some(ref dbg) = app.debugger {
+                let max = dbg.bookmarks.count();
+                app.bookmarks_view_state.navigate_up(max);
+            }
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            if let Some(ref dbg) = app.debugger {
+                let max = dbg.bookmarks.count();
+                app.bookmarks_view_state.navigate_down(max);
+            }
+        }
+        KeyCode::Char('g') | KeyCode::Char('G') => {
+            app.goto_selected_bookmark();
+        }
+        KeyCode::Char('e') | KeyCode::Char('E') => {
+            app.start_editing_bookmark();
+        }
+        KeyCode::Char('d') | KeyCode::Char('D') => {
+            app.delete_selected_bookmark();
+        }
+        KeyCode::Esc => {
+            app.bookmarks_dialog_open = false;
+            app.bookmarks_view_state.selected = 0;
         }
         _ => {}
     }
