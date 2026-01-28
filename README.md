@@ -325,8 +325,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Contact
 
-- GitHub: [@yourusername](https://github.com/yourusername)
-- Issues: [GitHub Issues](https://github.com/yourusername/revgame/issues)
+- GitHub: [@NeonFoundry](https://github.com/NeonFoundry)
+- Issues: [GitHub Issues](https://github.com/NeonFoundry/revgame/issues)
 
 ---
 
